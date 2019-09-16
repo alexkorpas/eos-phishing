@@ -16,7 +16,5 @@ for attribute in ["ip", "country", "domain", "email"]:
     # Plot the top 10 occurrence counts
     occurrence_counts.plot.bar()
     plt.tight_layout()
+    plt.savefig("")
     plt.show()
-
-# Compute and plot the phishing sources with the longest uptime
-
