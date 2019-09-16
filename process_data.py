@@ -16,5 +16,6 @@ for attribute in ["ip", "country", "domain", "email"]:
     # Plot the top 10 occurrence counts
     occurrence_counts.plot.bar()
     plt.tight_layout()
-    plt.savefig("")
+    plt.title(f"Top 10 {attribute} occurrence counts")
+    plt.savefig(f"./fig/{attribute}-occurrence-counts.png")
     plt.show()
