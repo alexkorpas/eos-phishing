@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 # Load the data frame
 # csv_files = glob.glob("./data/*.csv")
@@ -46,27 +46,42 @@ for (index, row) in df.iterrows():
 # unique_ips = df.ip.unique()
 
 # Compute the average phishing source uptime per month
-month_uptimes = np.zeros(13, dtype=int)
-month_row_amnts = np.zeros(13, dtype=int)
+earliest_year = min(df.start_dt).year
+month_uptimes = defaultdict(int)
+month_row_amnts = defaultdict(int)
 for (_, row) in df.iterrows():
+    year = row.start_dt.year
+    month = row.start_dt.month
+    
+    # Ignore rows with an unknown start date
+    if year == 1970:
+        continue
+
     uptime = (row.end_dt - row.start_dt).days
 
-    month = row.start_dt.month
-    month_uptimes[month] += uptime
-    month_row_amnts[month] += 1
+    idx = (year - 2000)*12 + month
+
+    month_uptimes[idx] += uptime
+    month_row_amnts[idx] += 1
 
 # Normalise each month's uptime
 normalised_month_uptimes = month_uptimes.copy()
-for month in range(13):
-    normalised_month_uptimes[month] /= month_row_amnts[month]
+for idx in month_uptimes.keys():
+    if month_row_amnts[idx] == 0:
+        continue
+    normalised_month_uptimes[idx] = month_uptimes[idx]/month_row_amnts[idx]
 
 # Plot the average uptime per month
-plt.plot()
-plt.title(f"Top 10 {attribute} occurrence counts")
-plt.tight_layout()
+ordered_pairs = OrderedDict(sorted(normalised_month_uptimes.items()))
+keys = [pair[0] for pair in ordered_pairs]
+values = [pair[1] for pair in ordered_pairs]
+plt.bar(keys, values)
+plt.title(f"Average uptime over time")
+plt.ylabel("Days")
+plt.xlabel("Month")
+# plt.tight_layout()
 # plt.savefig(f"./fig/{attribute}-occurrence-counts.png")
-# plt.show()
-plt.clf()
+plt.show()
 
 # Compute the percentage of phishing attcks hosted on HTTPS
 
