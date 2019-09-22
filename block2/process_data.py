@@ -7,7 +7,7 @@ import glob
 from collections import defaultdict, OrderedDict
 
 # Load the data frame
-csv_files = glob.glob("./data/*.csv")
+csv_files = glob.glob("../data/*.csv")
 dfs = [pd.read_csv(path, sep='","', engine="python") for path in csv_files]
 df = pd.concat(dfs, axis=0)
 del dfs  # Garbage collection
