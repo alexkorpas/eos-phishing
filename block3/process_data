@@ -1,19 +1,11 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
-from datetime import date
 
 print('reading data')
-# Load the data frame
-# csv_files = glob.glob("../data/*.csv")
-# dfs = [pd.read_csv(path, sep='","', engine="python") for path in csv_files]
-# df = pd.concat(dfs, axis=0)
-df = pd.read_csv("../data/all_phishing_from_1.csv", sep='","', engine="python")
-# del dfs  # Garbage collection
-paypal_df = pd.read_csv("../data/paypal_statistics.csv", engine="python")
-
-# Focus only on Paypal
-df = df.loc[df['virusname'] == 'PayPal']
+csv_files = glob.glob("../data/*.csv")
+dfs = [pd.read_csv(path, sep='","', engine="python") for path in csv_files]
+df = pd.concat(dfs, axis=0)
 
 # %% Compute average uptime over time
 # Convert all dates to datetime objects and add them to the DF
@@ -27,51 +19,82 @@ df["end_dt"] = pd.to_datetime(df["lasttime"])
 
 print('computing average uptime for each entry')
 # Calculate the uptime for each entry, group them by month and find average
-df1 = df[["start_dt", "end_dt"]]
+df1 = df[["virusname", "start_dt", "end_dt"]]
 df1["uptime"] = (df1["end_dt"] - df1["start_dt"]).astype('timedelta64[s]')
 df1 = df1.drop("end_dt", axis=1)
-df2 = df1.groupby(df1["start_dt"].dt.to_period("M")).mean()
+# df1 = df1.nlargest(10, 'virusname')
 
-# print(paypal_df)
+# group by company and then by datetime
+largest_count = 10
+filter_criteria = df1.groupby(['virusname']).count()['uptime'].nlargest(largest_count)
+filter_criteria = filter_criteria.drop('Other')
+filter_criteria = filter_criteria.drop('Paypal')
 
-# Do same for paypal
-paypal_df["start_dt"] = pd.to_datetime(paypal_df['quarter'].str.replace(r'(Q\d) (\d+)', r'\2-\1'), errors='coerce')
-paypal_df = paypal_df.drop("quarter", axis=1)
-paypal_df = paypal_df.groupby(paypal_df["start_dt"].dt.to_period("M")).mean()
+split = df1[df1.virusname.isin(filter_criteria.index)].groupby(['virusname'])
 
-df2 = df2.query('start_dt > @date(year=2012,month=1,day=1)')
-df2 = df2.query('start_dt < @date(year=2014,month=10,day=1)')
-paypal_df = paypal_df.query('start_dt > @date(year=2012,month=1,day=1)')
-paypal_df = paypal_df.query('start_dt < @date(year=2014,month=10,day=1)')
+ax = None
+count = 0
+companies = []
+plt.figure(figsize=(10,20))
+for virus_name in split:
+    if count > 5:
+        break
 
-# subplots
-plt.figure()
-f, axes = plt.subplots(2, 1)
-df2.plot(ax=axes[0])
-axes[0].set_ylabel('Uptime (seconds)')
+    companies.append(virus_name[0])
+    virus_name = pd.DataFrame(virus_name[1], columns=['start_dt', 'uptime'])
+    virus_name = virus_name.groupby(virus_name["start_dt"].dt.to_period("M")).mean()
 
-paypal_df.plot(ax=axes[1], kind='bar')
-axes[1].set_ylabel('Users (million)')
-plt.savefig('fig/paypal-uptime-subplots.png')
+    count += 1
+    if ax is None:
+        ax = virus_name.plot(figsize=(60, 30))
+    else:
+        virus_name.plot(ax=ax,figsize=(60, 30))
 
-# overlayed
-fig = plt.figure()
-ax1 = fig.add_subplot()
-ax1.set_xlabel("Date")
-df2.plot(ax=ax1, color='b')
-ax1.set_ylabel('Uptime (seconds)')
-
-ax2 = ax1.twinx()
-paypal_df.plot(ax=ax2, kind='bar', color='g')
-ax2.set_ylabel('Users (million)')
-
-fig.savefig('fig/paypal-uptime-vs-date-overlayed.png')
-
-# single
-df2.plot()
-plt.title(f"Average Paypal phishing websites uptime over time")
-plt.ylabel("Uptime (seconds)")
+plt.title(f"Phishing websites uptime for top " + str(largest_count) + " virus names")
+plt.ylabel("Average uptime (seconds)")
 plt.xlabel("Date")
-plt.tight_layout()
-plt.savefig("fig/paypal-uptime-vs-date-single.png")
-plt.clf()
+plt.legend(companies)
+
+plt.savefig("fig/grouped-uptime-vs-date.png")
+plt.show()
+
+ax = None
+count = 0
+companies = []
+
+start_year = 2012
+start_month = 6
+start_day = 1
+
+end_year = 2015
+end_month = 1
+end_day = 1
+
+for virus_name in split:
+    if count > 5:
+        break
+
+    companies.append(virus_name[0])
+    virus_name = pd.DataFrame(virus_name[1], columns=['start_dt', 'uptime'])
+    virus_name = virus_name.groupby(virus_name["start_dt"].dt.to_period("M")).mean()
+
+    virus_name = virus_name.query(f'start_dt > @date(year={start_year},month={start_month},day={start_day})')
+    virus_name = virus_name.query(f'start_dt < @date(year={end_year},month={end_month},day={end_day})')
+    if virus_name.empty:
+        continue
+
+    count += 1
+    if ax is None:
+        ax = virus_name.plot(figsize=(60, 30))
+    else:
+        virus_name.plot(ax=ax,figsize=(60, 30))
+
+plt.title(f"Phishing websites uptime for top {largest_count} virus names\n" +
+          f"between {start_year}/{start_month}/{start_day} and " +
+          f"{end_year}/{end_month}/{end_day}")
+plt.ylabel("Average uptime (seconds)")
+plt.xlabel("Date")
+plt.legend(companies)
+
+plt.savefig("fig/grouped-uptime-vs-date-zoomed.png")
+plt.show()
