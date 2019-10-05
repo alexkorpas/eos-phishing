@@ -1,11 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
+from datetime import date
 
 print('reading data')
 csv_files = glob.glob("../data/*.csv")
 dfs = [pd.read_csv(path, sep='","', engine="python") for path in csv_files]
 df = pd.concat(dfs, axis=0)
+# df = pd.read_csv("../data/all_phishing_from_1.csv", sep='","', engine="python")
 
 # %% Compute average uptime over time
 # Convert all dates to datetime objects and add them to the DF
@@ -25,42 +27,33 @@ df1 = df1.drop("end_dt", axis=1)
 # df1 = df1.nlargest(10, 'virusname')
 
 # group by company and then by datetime
-largest_count = 10
+largest_count = 8
 filter_criteria = df1.groupby(['virusname']).count()['uptime'].nlargest(largest_count)
 filter_criteria = filter_criteria.drop('Other')
 filter_criteria = filter_criteria.drop('Paypal')
+filter_criteria = filter_criteria.drop('2017-04-07 16:11:11')
 
 split = df1[df1.virusname.isin(filter_criteria.index)].groupby(['virusname'])
 
 ax = None
-count = 0
 companies = []
-plt.figure(figsize=(10,20))
 for virus_name in split:
-    if count > 5:
-        break
-
     companies.append(virus_name[0])
     virus_name = pd.DataFrame(virus_name[1], columns=['start_dt', 'uptime'])
     virus_name = virus_name.groupby(virus_name["start_dt"].dt.to_period("M")).mean()
-
-    count += 1
     if ax is None:
-        ax = virus_name.plot(figsize=(60, 30))
+        ax = virus_name.plot()
     else:
-        virus_name.plot(ax=ax,figsize=(60, 30))
+        virus_name.plot(ax=ax)
 
 plt.title(f"Phishing websites uptime for top " + str(largest_count) + " virus names")
 plt.ylabel("Average uptime (seconds)")
 plt.xlabel("Date")
 plt.legend(companies)
 
-plt.savefig("fig/grouped-uptime-vs-date.png")
+plt.savefig(f"fig/grouped-top-{filter_criteria.size}-uptime-vs-date.png")
 plt.show()
-
-ax = None
-count = 0
-companies = []
+plt.clf()
 
 start_year = 2012
 start_month = 6
@@ -70,31 +63,28 @@ end_year = 2015
 end_month = 1
 end_day = 1
 
+ax = None
+companies = []
 for virus_name in split:
-    if count > 5:
-        break
-
-    companies.append(virus_name[0])
+    company = virus_name[0]
     virus_name = pd.DataFrame(virus_name[1], columns=['start_dt', 'uptime'])
     virus_name = virus_name.groupby(virus_name["start_dt"].dt.to_period("M")).mean()
 
     virus_name = virus_name.query(f'start_dt > @date(year={start_year},month={start_month},day={start_day})')
     virus_name = virus_name.query(f'start_dt < @date(year={end_year},month={end_month},day={end_day})')
-    if virus_name.empty:
-        continue
+    if not virus_name.empty:
+        companies.append(company)
+        if ax is None:
+            ax = virus_name.plot()
+        else:
+            virus_name.plot(ax=ax)
 
-    count += 1
-    if ax is None:
-        ax = virus_name.plot(figsize=(60, 30))
-    else:
-        virus_name.plot(ax=ax,figsize=(60, 30))
-
-plt.title(f"Phishing websites uptime for top {largest_count} virus names\n" +
+plt.title(f"Phishing websites uptime for top {filter_criteria.size} virus names\n" +
           f"between {start_year}/{start_month}/{start_day} and " +
           f"{end_year}/{end_month}/{end_day}")
 plt.ylabel("Average uptime (seconds)")
 plt.xlabel("Date")
 plt.legend(companies)
 
-plt.savefig("fig/grouped-uptime-vs-date-zoomed.png")
+plt.savefig(f"fig/grouped-top-{filter_criteria.size}-uptime-vs-date-zoomed.png")
 plt.show()
