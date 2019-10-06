@@ -1,0 +1,90 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import glob
+from datetime import date
+
+print('reading data')
+csv_files = glob.glob("../data/*.csv")
+dfs = [pd.read_csv(path, sep='","', engine="python") for path in csv_files]
+df = pd.concat(dfs, axis=0)
+# df = pd.read_csv("../data/all_phishing_from_1.csv", sep='","', engine="python")
+
+# %% Compute average uptime over time
+# Convert all dates to datetime objects and add them to the DF
+# by fixing firsttime and lasttime
+print('computing average uptime over time')
+max_dt = df['lasttime'].max()
+df = df[df['firsttime'] != '1970-01-01 01:00:00']
+df.loc[df['lasttime'] < df['firsttime']] = max_dt
+df["start_dt"] = pd.to_datetime(df["firsttime"])
+df["end_dt"] = pd.to_datetime(df["lasttime"])
+
+print('computing average uptime for each entry')
+# Calculate the uptime for each entry, group them by month and find average
+df1 = df[["virusname", "start_dt", "end_dt"]]
+df1["uptime"] = (df1["end_dt"] - df1["start_dt"]).astype('timedelta64[s]')
+df1 = df1.drop("end_dt", axis=1)
+# df1 = df1.nlargest(10, 'virusname')
+
+# group by company and then by datetime
+largest_count = 8
+filter_criteria = df1.groupby(['virusname']).count()['uptime'].nlargest(largest_count)
+filter_criteria = filter_criteria.drop('Other')
+filter_criteria = filter_criteria.drop('Paypal')
+filter_criteria = filter_criteria.drop('2017-04-07 16:11:11')
+
+split = df1[df1.virusname.isin(filter_criteria.index)].groupby(['virusname'])
+
+ax = None
+companies = []
+for virus_name in split:
+    companies.append(virus_name[0])
+    virus_name = pd.DataFrame(virus_name[1], columns=['start_dt', 'uptime'])
+    virus_name = virus_name.groupby(virus_name["start_dt"].dt.to_period("M")).mean()
+    if ax is None:
+        ax = virus_name.plot()
+    else:
+        virus_name.plot(ax=ax)
+
+plt.title(f"Phishing websites uptime for top " + str(largest_count) + " virus names")
+plt.ylabel("Average uptime (seconds)")
+plt.xlabel("Date")
+plt.legend(companies)
+
+plt.savefig(f"fig/grouped-top-{filter_criteria.size}-uptime-vs-date.png")
+plt.show()
+plt.clf()
+
+start_year = 2012
+start_month = 6
+start_day = 1
+
+end_year = 2015
+end_month = 1
+end_day = 1
+
+ax = None
+companies = []
+for virus_name in split:
+    company = virus_name[0]
+    virus_name = pd.DataFrame(virus_name[1], columns=['start_dt', 'uptime'])
+    virus_name = virus_name.groupby(virus_name["start_dt"].dt.to_period("M")).mean()
+
+    virus_name = virus_name.query(f'start_dt > @date(year={start_year},month={start_month},day={start_day})')
+    virus_name = virus_name.query(f'start_dt < @date(year={end_year},month={end_month},day={end_day})')
+    if not virus_name.empty:
+        companies.append(company)
+        if ax is None:
+            ax = virus_name.plot()
+        else:
+            virus_name.plot(ax=ax)
+
+plt.title(f"Phishing websites uptime for top {filter_criteria.size} virus names\n" +
+          f"between {start_year}/{start_month}/{start_day} and " +
+          f"{end_year}/{end_month}/{end_day}")
+plt.ylabel("Average uptime (seconds)")
+plt.xlabel("Date")
+plt.legend(companies)
+
+plt.savefig(f"fig/grouped-top-{filter_criteria.size}-uptime-vs-date-zoomed.png")
+plt.show()
