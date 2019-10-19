@@ -71,7 +71,7 @@ print(corr_mat)
 sns.heatmap(corr_mat, annot=True)  # Requires matplotlib version <=3.1.0
 plt.tight_layout()
 plt.show()
-# plt.savefig("./fig/pearson-corr-heatmap.png")
+# plt.savefig("./fig/norm-pearson-corr-heatmap.png")
 
 # Export the analysis DF to CSV for ease of usage
 analysis_df.to_csv("./norm-stat-analysis-data.csv", sep=",")
